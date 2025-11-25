@@ -68,6 +68,7 @@ main()
 				LCD_Data(3);
 				LCD_Data(0);
 				LCD_Data(1);
+				LCD_Data(1);
 				break;
 			}
 		}
