@@ -1,76 +1,79 @@
-#define F_CPU 16000000UL
 #include <avr/io.h>
 #include <util/delay.h>
-#include <avr/interrupt.h>
+#include <stdio.h>
 #include "mylcd.h"
-#include "mychar.h"
 
-int state = 0;
-int update_flag = 1;
-
-ISR(INT0_vect)
+void ADC_Init(void)
 {
-	cli();
-	_delay_ms(50);
+	ADMUX = (1 << REFS0) | (1 << MUX1) | (1 << MUX0); // 기준전압 5V, PF3
 
-	state++;
-	if (state > 3)
-	{
-		state = 0;
-	}
-
-	update_flag = 1;
-
-	EIFR |= (1 << INTF0);
-	sei();
+	ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0); // adc 설정 분주비 128
 }
 
-main()
+int ADC_Read(void) // adc값 읽어오기
 {
+	ADCSRA |= (1 << ADSC);
+	while (ADCSRA & (1 << ADSC))
+		;
+	return ADC;
+}
+
+main(void)
+{
+	int adc_value;
+	float voltage;
+	char buffer[20];
+	int v_int, v_dec;
+	unsigned char num_fnd; // 7세그먼트에 띄울 숫자 (0~9)
+
 	PortInit();
 	LCD_Init();
-	Init_MyChars();
+	ADC_Init();
 
-	DDRD &= ~(1 << DDD0);
-	PORTD |= (1 << PD0);
-
-	EICRA = (1 << ISC01);
-	EIMSK |= (1 << INT0);
-
-	sei();
+	DDRC |= 0x0F;
 
 	while (1)
 	{
-		if (update_flag == 1)
-		{
-			update_flag = 0;
+		adc_value = ADC_Read();
+		voltage = adc_value * (5.0 / 1024.0); // 전압계산 기준 5V
 
-			switch (state)
-			{
-			case 0:
-				LCD_Clear();
-				break;
+		if (adc_value >= 900)
+			num_fnd = 9;
+		else if (adc_value >= 800)
+			num_fnd = 8;
+		else if (adc_value >= 700)
+			num_fnd = 7;
+		else if (adc_value >= 600)
+			num_fnd = 6;
+		else if (adc_value >= 500)
+			num_fnd = 5;
+		else if (adc_value >= 400)
+			num_fnd = 4;
+		else if (adc_value >= 300)
+			num_fnd = 3;
+		else if (adc_value >= 200)
+			num_fnd = 2;
+		else if (adc_value >= 100)
+			num_fnd = 1;
+		else
+			num_fnd = 0;
 
-			case 1:
-				LCD_pos(0, 0);
-				LCD_STR("20221330");
-				break;
+		PORTC = (PORTC & 0xF0) | (num_fnd & 0x0F); // 7seg decoder pc0~pc3
 
-			case 2:
-				LCD_pos(0, 1);
-				LCD_STR("HGJ");
-				break;
+		v_int = (int)voltage;					// 전압 정수부
+		v_dec = (int)((voltage - v_int) * 100); // 전압 실수부
 
-			case 3:
-				LCD_pos(3, 1);
-				LCD_STR(" ");
-				LCD_Data(2);
-				LCD_Data(3);
-				LCD_Data(0);
-				LCD_Data(1);
-				break;
-			}
-		}
+		LCD_Clear();
+
+		sprintf(buffer, "Volt: %d.%02dV", v_int, v_dec);
+		LCD_pos(0, 0);
+		LCD_STR(buffer);
+
+		sprintf(buffer, "Value: %d", adc_value);
+		LCD_pos(0, 1);
+		LCD_STR(buffer);
+
+		_delay_ms(200);
 	}
 	return 0;
 }
