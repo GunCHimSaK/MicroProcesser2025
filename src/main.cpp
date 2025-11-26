@@ -65,7 +65,7 @@ main(void)
 
 		LCD_Clear();
 
-		sprintf(buffer, "Volt: %d.%02dV", v_int, v_dec);
+		sprintf(buffer, "Voltage: %d.%02dV", v_int, v_dec);
 		LCD_pos(0, 0);
 		LCD_STR(buffer);
 
