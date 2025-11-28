@@ -5,26 +5,27 @@
 
 void ADC_Init(void)
 {
-	ADMUX = (1 << REFS0) | (1 << MUX1) | (1 << MUX0); // 기준전압 5V, PF3
-
-	ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0); // adc 설정 분주비 128
+	ADMUX = (1 << MUX1) | (1 << MUX0);												 // pf3으로 변경
+	ADCSRA = (1 << ADEN) | (1 << ADFR) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0); // 분주비 128 & adc &freerunning 활성화
+	ADCSRA |= (1 << ADSC);															 // 변환시작
 }
 
-int ADC_Read(void) // adc값 읽어오기
+int ADC_Read(void) // ADCL&ADCH를 합쳐서 ADC값 반환
 {
-	ADCSRA |= (1 << ADSC);
-	while (ADCSRA & (1 << ADSC))
-		;
-	return ADC;
+	unsigned char low_byte = ADCL;
+	unsigned char high_byte = ADCH;
+	int result = (high_byte << 8) | low_byte;
+
+	return result;
 }
 
-main(void)
+int main(void)
 {
 	int adc_value;
 	float voltage;
 	char buffer[20];
 	int v_int, v_dec;
-	unsigned char num_fnd; // 7세그먼트에 띄울 숫자 (0~9)
+	unsigned char num_fnd;
 
 	PortInit();
 	LCD_Init();
@@ -35,7 +36,7 @@ main(void)
 	while (1)
 	{
 		adc_value = ADC_Read();
-		voltage = adc_value * (5.0 / 1024.0); // 전압계산 기준 5V
+		voltage = adc_value * (5.0 / 1024.0);
 
 		if (adc_value >= 900)
 			num_fnd = 9;
@@ -58,14 +59,14 @@ main(void)
 		else
 			num_fnd = 0;
 
-		PORTC = (PORTC & 0xF0) | (num_fnd & 0x0F); // 7seg decoder pc0~pc3
+		PORTC = (PORTC & 0xF0) | (num_fnd & 0x0F);
 
-		v_int = (int)voltage;					// 전압 정수부
-		v_dec = (int)((voltage - v_int) * 100); // 전압 실수부
+		v_int = (int)voltage;
+		v_dec = (int)((voltage - v_int) * 1000);
 
 		LCD_Clear();
 
-		sprintf(buffer, "Voltage: %d.%02dV", v_int, v_dec);
+		sprintf(buffer, "Voltage: %d.%03dV", v_int, v_dec);
 		LCD_pos(0, 0);
 		LCD_STR(buffer);
 
