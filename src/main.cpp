@@ -1,7 +1,31 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include <stdio.h>
+#include <avr/interrupt.h>
 #include "mylcd.h"
+
+int LED_sec = 0;
+
+ISR(TIMER0_COMP_vect)
+{
+	static int count = 0;
+
+	if (LED_sec == 0)
+	{
+		PORTB |= (1 << PB0);
+		count = 0;
+	}
+	else
+	{
+
+		count++;
+		if (count >= LED_sec)
+		{
+			PORTC ^= (1 << PC4); // 토글(^)
+			count = 0;			 // 카운트 초기화
+		}
+	}
+}
 
 void ADC_Init(void)
 {
@@ -32,11 +56,41 @@ int main(void)
 	ADC_Init();
 
 	DDRC |= 0x0F;
+	DDRC |= (1 << PC4);
+
+	TCCR0 = (1 << WGM01) | (1 << CS02) | (1 << CS01) | (1 << CS00); // CTC모드 분주비 1024
+
+	OCR0 = 155;
+
+	TIMSK |= (1 << OCIE0);
+
+	sei();
 
 	while (1)
 	{
 		adc_value = ADC_Read();
 		voltage = adc_value * (5.0 / 1024.0);
+
+		if (voltage >= 4.0)
+		{
+			LED_sec = 0;
+		}
+		else if (voltage >= 3.0)
+		{
+			LED_sec = 10;
+		}
+		else if (voltage >= 2.0)
+		{
+			LED_sec = 25;
+		}
+		else if (voltage >= 1.0)
+		{
+			LED_sec = 50;
+		}
+		else
+		{
+			LED_sec = 100;
+		}
 
 		if (adc_value >= 900)
 			num_fnd = 9;
